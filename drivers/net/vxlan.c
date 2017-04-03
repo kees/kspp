@@ -2322,6 +2322,9 @@ static void vxlan_cleanup(unsigned long arg)
 			if (f->state & (NUD_PERMANENT | NUD_NOARP))
 				continue;
 
+			if (f->flags & NTF_EXT_LEARNED)
+				continue;
+
 			timeout = f->used + vxlan->cfg.age_interval * HZ;
 			if (time_before_eq(timeout, jiffies)) {
 				netdev_dbg(vxlan->dev,
@@ -2921,6 +2924,11 @@ static int vxlan_dev_configure(struct net *src_net, struct net_device *dev,
 		   vxlan_addr_multicast(&dst->remote_ip)) {
 		pr_info("multicast destination requires interface to be specified\n");
 		return -EINVAL;
+	}
+
+	if (lowerdev) {
+		dev->gso_max_size = lowerdev->gso_max_size;
+		dev->gso_max_segs = lowerdev->gso_max_segs;
 	}
 
 	if (conf->mtu) {

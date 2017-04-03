@@ -16,6 +16,7 @@
 #include <linux/irq.h>
 #include <linux/gpio/consumer.h>
 #include <linux/phy.h>
+#include <net/dsa.h>
 
 #ifndef UINT64_MAX
 #define UINT64_MAX		(u64)(~((u64)0))
@@ -438,8 +439,13 @@
 #define GLOBAL2_WDOG_FORCE_IRQ			BIT(0)
 #define GLOBAL2_QOS_WEIGHT	0x1c
 #define GLOBAL2_MISC		0x1d
+#define GLOBAL2_MISC_5_BIT_PORT	BIT(14)
 
 #define MV88E6XXX_N_FID		4096
+
+/* PVT limits for 4-bit port and 5-bit switch */
+#define MV88E6XXX_MAX_PVT_SWITCHES	32
+#define MV88E6XXX_MAX_PVT_PORTS		16
 
 enum mv88e6xxx_frame_mode {
 	MV88E6XXX_FRAME_MODE_NORMAL,
@@ -526,8 +532,6 @@ enum mv88e6xxx_cap {
 	MV88E6XXX_CAP_G2_MGMT_EN_0X,	/* (0x03) MGMT Enable Register 0x */
 	MV88E6XXX_CAP_G2_IRL_CMD,	/* (0x09) Ingress Rate Command */
 	MV88E6XXX_CAP_G2_IRL_DATA,	/* (0x0a) Ingress Rate Data */
-	MV88E6XXX_CAP_G2_PVT_ADDR,	/* (0x0b) Cross Chip Port VLAN Addr */
-	MV88E6XXX_CAP_G2_PVT_DATA,	/* (0x0c) Cross Chip Port VLAN Data */
 	MV88E6XXX_CAP_G2_POT,		/* (0x0f) Priority Override Table */
 
 	/* Per VLAN Spanning Tree Unit (STU).
@@ -560,8 +564,6 @@ enum mv88e6xxx_cap {
 #define MV88E6XXX_FLAG_G2_MGMT_EN_0X	BIT_ULL(MV88E6XXX_CAP_G2_MGMT_EN_0X)
 #define MV88E6XXX_FLAG_G2_IRL_CMD	BIT_ULL(MV88E6XXX_CAP_G2_IRL_CMD)
 #define MV88E6XXX_FLAG_G2_IRL_DATA	BIT_ULL(MV88E6XXX_CAP_G2_IRL_DATA)
-#define MV88E6XXX_FLAG_G2_PVT_ADDR	BIT_ULL(MV88E6XXX_CAP_G2_PVT_ADDR)
-#define MV88E6XXX_FLAG_G2_PVT_DATA	BIT_ULL(MV88E6XXX_CAP_G2_PVT_DATA)
 #define MV88E6XXX_FLAG_G2_POT		BIT_ULL(MV88E6XXX_CAP_G2_POT)
 
 #define MV88E6XXX_FLAG_STU		BIT_ULL(MV88E6XXX_CAP_STU)
@@ -576,11 +578,6 @@ enum mv88e6xxx_cap {
 #define MV88E6XXX_FLAGS_MULTI_CHIP	\
 	(MV88E6XXX_FLAG_SMI_CMD |	\
 	 MV88E6XXX_FLAG_SMI_DATA)
-
-/* Cross-chip Port VLAN Table */
-#define MV88E6XXX_FLAGS_PVT		\
-	(MV88E6XXX_FLAG_G2_PVT_ADDR |	\
-	 MV88E6XXX_FLAG_G2_PVT_DATA)
 
 /* Fiber/SERDES Registers at SMI address F, page 1 */
 #define MV88E6XXX_FLAGS_SERDES		\
@@ -603,8 +600,7 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_STU |		\
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
-	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT)
+	 MV88E6XXX_FLAGS_MULTI_CHIP)
 
 #define MV88E6XXX_FLAGS_FAMILY_6165	\
 	(MV88E6XXX_FLAG_G1_VTU_FID |	\
@@ -616,8 +612,7 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_STU |		\
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
-	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT)
+	 MV88E6XXX_FLAGS_MULTI_CHIP)
 
 #define MV88E6XXX_FLAGS_FAMILY_6185	\
 	(MV88E6XXX_FLAG_GLOBAL2 |	\
@@ -634,8 +629,7 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_G2_POT |	\
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
-	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT)
+	 MV88E6XXX_FLAGS_MULTI_CHIP)
 
 #define MV88E6XXX_FLAGS_FAMILY_6341	\
 	(MV88E6XXX_FLAG_EEE |		\
@@ -647,7 +641,6 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
 	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT |		\
 	 MV88E6XXX_FLAGS_SERDES)
 
 #define MV88E6XXX_FLAGS_FAMILY_6351	\
@@ -660,8 +653,7 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_STU |		\
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
-	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT)
+	 MV88E6XXX_FLAGS_MULTI_CHIP)
 
 #define MV88E6XXX_FLAGS_FAMILY_6352	\
 	(MV88E6XXX_FLAG_EEE |		\
@@ -675,7 +667,6 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
 	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT |		\
 	 MV88E6XXX_FLAGS_SERDES)
 
 #define MV88E6XXX_FLAGS_FAMILY_6390	\
@@ -685,8 +676,7 @@ enum mv88e6xxx_cap {
 	 MV88E6XXX_FLAG_STU |		\
 	 MV88E6XXX_FLAG_VTU |		\
 	 MV88E6XXX_FLAGS_IRL |		\
-	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
-	 MV88E6XXX_FLAGS_PVT)
+	 MV88E6XXX_FLAGS_MULTI_CHIP)
 
 struct mv88e6xxx_ops;
 
@@ -700,6 +690,7 @@ struct mv88e6xxx_info {
 	unsigned int global1_addr;
 	unsigned int age_time_coeff;
 	unsigned int g1_irqs;
+	bool pvt;
 	enum dsa_tag_protocol tag_protocol;
 	unsigned long long flags;
 
@@ -933,6 +924,11 @@ static inline bool mv88e6xxx_has(struct mv88e6xxx_chip *chip,
 				 unsigned long flags)
 {
 	return (chip->info->flags & flags) == flags;
+}
+
+static inline bool mv88e6xxx_has_pvt(struct mv88e6xxx_chip *chip)
+{
+	return chip->info->pvt;
 }
 
 static inline unsigned int mv88e6xxx_num_databases(struct mv88e6xxx_chip *chip)
