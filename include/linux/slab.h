@@ -21,6 +21,13 @@
  * The ones marked DEBUG are only valid if CONFIG_DEBUG_SLAB is set.
  */
 #define SLAB_CONSISTENCY_CHECKS	0x00000100UL	/* DEBUG: Perform (expensive) checks on alloc/free */
+
+#ifdef CONFIG_HARDENED_USERCOPY
+#define SLAB_USERCOPY		0x00000200UL	/* Security: Allow copying objs to/from userspace */
+#else
+#define SLAB_USERCOPY		0x00000000UL
+#endif
+
 #define SLAB_RED_ZONE		0x00000400UL	/* DEBUG: Red zone objs in a cache */
 #define SLAB_POISON		0x00000800UL	/* DEBUG: Poison objects */
 #define SLAB_HWCACHE_ALIGN	0x00002000UL	/* Align objs on cache lines */
@@ -127,6 +134,9 @@ bool slab_is_available(void);
 struct kmem_cache *kmem_cache_create(const char *, size_t, size_t,
 			unsigned long,
 			void (*)(void *));
+struct kmem_cache *kmem_cache_create_usercopy(const char *, size_t, size_t,
+			unsigned long, size_t, size_t,
+			void (*)(void *));
 void kmem_cache_destroy(struct kmem_cache *);
 int kmem_cache_shrink(struct kmem_cache *);
 
@@ -145,6 +155,11 @@ void memcg_destroy_kmem_caches(struct mem_cgroup *);
 #define KMEM_CACHE(__struct, __flags) kmem_cache_create(#__struct,\
 		sizeof(struct __struct), __alignof__(struct __struct),\
 		(__flags), NULL)
+
+#define KMEM_CACHE_USERCOPY(__struct, __flags, __field) kmem_cache_create_usercopy(#__struct,\
+       sizeof(struct __struct), __alignof__(struct __struct),\
+       (__flags), offsetof(struct __struct, __field),\
+       sizeof(((struct __struct *)0)->__field), NULL)
 
 /*
  * Common kmalloc functions provided by all allocators
