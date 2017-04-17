@@ -992,10 +992,12 @@ static void init_once(void *foo)
 
 static int __init init_inodecache(void)
 {
-	ext4_inode_cachep = kmem_cache_create("ext4_inode_cache",
+	ext4_inode_cachep = kmem_cache_create_usercopy("ext4_inode_cache",
 					     sizeof(struct ext4_inode_info),
 					     0, (SLAB_RECLAIM_ACCOUNT|
 						SLAB_MEM_SPREAD|SLAB_ACCOUNT),
+						offsetof(struct ext4_inode_info, i_data),
+						sizeof(((struct ext4_inode_info *)0)->i_data),
 					     init_once);
 	if (ext4_inode_cachep == NULL)
 		return -ENOMEM;
