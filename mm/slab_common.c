@@ -923,19 +923,25 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 	s->refcount = -1;	/* Exempt from merging for now */
 }
 
-struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
-				unsigned long flags)
+struct kmem_cache *__init create_kmalloc_cache_usercopy(const char *name, size_t size,
+				unsigned long flags, size_t useroffset, size_t usersize)
 {
 	struct kmem_cache *s = kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
 
 	if (!s)
 		panic("Out of memory when creating slab %s\n", name);
 
-	create_boot_cache(s, name, size, flags);
+	create_boot_cache(s, name, size, flags, useroffset, usersize);
 	list_add(&s->list, &slab_caches);
 	memcg_link_cache(s);
 	s->refcount = 1;
 	return s;
+}
+
+struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
+				unsigned long flags)
+{
+	return create_kmalloc_cache_usercopy(name, size, flags, 0, 0);
 }
 
 struct kmem_cache *kmalloc_caches[KMALLOC_SHIFT_HIGH + 1];
@@ -945,6 +951,9 @@ EXPORT_SYMBOL(kmalloc_caches);
 struct kmem_cache *kmalloc_dma_caches[KMALLOC_SHIFT_HIGH + 1];
 EXPORT_SYMBOL(kmalloc_dma_caches);
 #endif
+
+struct kmem_cache *kmalloc_usercopy_caches[KMALLOC_SHIFT_HIGH + 1];
+EXPORT_SYMBOL(kmalloc_usercopy_caches);
 
 /*
  * Conversion table for small slabs sizes / 8 to the index in the
@@ -1010,6 +1019,10 @@ struct kmem_cache *kmalloc_slab(size_t size, gfp_t flags)
 		return kmalloc_dma_caches[index];
 
 #endif
+
+	if (unlikely((flags & GFP_USERCOPY)))
+		return kmalloc_usercopy_caches[index];
+
 	return kmalloc_caches[index];
 }
 
@@ -1084,8 +1097,8 @@ void __init setup_kmalloc_cache_index_table(void)
 
 static void __init new_kmalloc_cache(int idx, unsigned long flags)
 {
-	kmalloc_caches[idx] = create_kmalloc_cache(kmalloc_info[idx].name,
-					kmalloc_info[idx].size, flags);
+	kmalloc_caches[idx] = create_kmalloc_cache_usercopy(kmalloc_info[idx].name,
+					kmalloc_info[idx].size, flags, 0, kmalloc_info[idx].size);
 }
 
 /*
@@ -1130,6 +1143,20 @@ void __init create_kmalloc_caches(unsigned long flags)
 		}
 	}
 #endif
+
+	for (i = 0; i < KMALLOC_SHIFT_HIGH; i++) {
+		struct kmem_cache *s = kmalloc_caches[i];
+
+		if (s) {
+			int size = kmalloc_size(i);
+			char *n = kasprintf(GFP_NOWAIT,
+					"usercopy-kmalloc-%d", size);
+
+			BUG_ON(!n);
+			kmalloc_usercopy_caches[i] = create_kmalloc_cache_usercopy(n,
+					size, flags, 0, size);
+		}
+	}
 }
 #endif /* !CONFIG_SLOB */
 
