@@ -5618,6 +5618,12 @@ static char *create_unique_id(struct kmem_cache *s)
 	if (p != name + 1)
 		*p++ = '-';
 	p += sprintf(p, "%07d", s->size);
+	if (s->usersize) {
+		*p++ = '-';
+		p += sprintf(p, "%07zd", s->useroffset);
+		*p++ = '-';
+		p += sprintf(p, "%07zd", s->usersize);
+	}
 
 	BUG_ON(p > name + ID_STR_LENGTH - 1);
 	return name;

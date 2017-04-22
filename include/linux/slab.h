@@ -129,6 +129,9 @@ bool slab_is_available(void);
 struct kmem_cache *kmem_cache_create(const char *, size_t, size_t,
 			unsigned long,
 			void (*)(void *));
+struct kmem_cache *kmem_cache_create_usercopy(const char *, size_t, size_t,
+			unsigned long, size_t, size_t,
+			void (*)(void *));
 void kmem_cache_destroy(struct kmem_cache *);
 int kmem_cache_shrink(struct kmem_cache *);
 
@@ -147,6 +150,11 @@ void memcg_destroy_kmem_caches(struct mem_cgroup *);
 #define KMEM_CACHE(__struct, __flags) kmem_cache_create(#__struct,\
 		sizeof(struct __struct), __alignof__(struct __struct),\
 		(__flags), NULL)
+
+#define KMEM_CACHE_USERCOPY(__struct, __flags, __field) kmem_cache_create_usercopy(#__struct,\
+		sizeof(struct __struct), __alignof__(struct __struct),\
+		(__flags), offsetof(struct __struct, __field),\
+		sizeof_field(struct __struct, __field), NULL)
 
 /*
  * Common kmalloc functions provided by all allocators
