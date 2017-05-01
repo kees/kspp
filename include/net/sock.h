@@ -1091,6 +1091,8 @@ struct proto {
 	struct kmem_cache	*slab;
 	unsigned int		obj_size;
 	int			slab_flags;
+	size_t	useroffset;		/* USERCOPY region offset */
+	size_t	usersize;		/* USERCOPY region size */
 
 	struct percpu_counter	*orphan_count;
 
