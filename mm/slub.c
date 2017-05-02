@@ -3796,7 +3796,7 @@ EXPORT_SYMBOL(__kmalloc_node);
 
 #ifdef CONFIG_HARDENED_USERCOPY
 /*
- * Rejects objects that are incorrectly sized.
+ * Detect unwanted object access.
  *
  * Returns NULL if check passes, otherwise const char * to name of cache
  * to indicate an error.
@@ -3806,11 +3806,9 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
 {
 	struct kmem_cache *s;
 	unsigned long offset;
-	size_t object_size;
 
 	/* Find object and usable object size. */
 	s = page->slab_cache;
-	object_size = slab_ksize(s);
 
 	/* Reject impossible pointers. */
 	if (ptr < page_address(page))
@@ -3826,11 +3824,15 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
 		offset -= s->red_left_pad;
 	}
 
-	/* Allow address range falling entirely within object size. */
-	if (offset <= object_size && n <= object_size - offset)
-		return NULL;
+	/* Make sure object falls entirely within cache's usercopy region. */
+	if (offset < s->useroffset)
+		return s->name;
+	if (offset - s->useroffset > s->usersize)
+		return s->name;
+	if (n > s->useroffset - offset + s->usersize)
+		return s->name;
 
-	return s->name;
+	return NULL;
 }
 #endif /* CONFIG_HARDENED_USERCOPY */
 
